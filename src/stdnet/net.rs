@@ -6,6 +6,8 @@ use std::os::raw::c_int;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::path::Path;
 use std::time::Duration;
+use std::task::Poll;
+use tokio::net::{AsyncRead, AsyncWrite};
 
 use winapi::um::winsock2::{
     bind, connect, getpeername, getsockname, listen, SO_RCVTIMEO, SO_SNDTIMEO,
@@ -315,6 +317,35 @@ impl IntoRawSocket for UnixStream {
         let ret = self.0.as_raw_socket();
         mem::forget(self);
         ret
+    }
+}
+
+impl AsyncRead for UnixStream {
+    fn poll_read(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> Poll<std::io::Result<()>> {
+        self.poll_read(cx, buf)
+    }
+}
+
+impl AsyncWrite for UnixStream {
+    fn poll_write(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &[u8],
+        ) -> Poll<Result<usize, std::io::Error>> {
+        self.poll_write_priv(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        self.shutdown_std(std::net::Shutdown::Write)?;
+        Poll::Ready(Ok(()))
     }
 }
 
