@@ -5,6 +5,7 @@ extern crate winapi;
 
 #[cfg(windows)]
 extern crate tempfile;
+extern crate tokio;
 
 #[cfg(windows)]
 mod stdnet;
