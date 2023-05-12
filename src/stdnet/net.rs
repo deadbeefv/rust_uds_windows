@@ -9,7 +9,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-extern crate tokio;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use winapi::um::winsock2::{

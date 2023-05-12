@@ -19,3 +19,5 @@ tempfile = "3"
 
 [dependencies]
 tokio = {version = "1.19", features = ["full"]}
+tokio-stream = {version = "0.1", features = ["net"]}
+tokio-rustls = { version = "0.23.4"}
