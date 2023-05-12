@@ -5,8 +5,12 @@ use std::net::Shutdown;
 use std::os::raw::c_int;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::path::Path;
+use std::pin::Pin;
+use std::task::Context;
 use std::time::Duration;
 use std::task::Poll;
+
+extern crate tokio;
 use tokio::net::{AsyncRead, AsyncWrite};
 
 use winapi::um::winsock2::{
