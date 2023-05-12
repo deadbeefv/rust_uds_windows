@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io;
+use std::io::Write;
 use std::mem;
 use std::net::Shutdown;
 use std::os::raw::c_int;
@@ -268,6 +269,16 @@ impl UnixStream {
     pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
         self.0.timeout(SO_SNDTIMEO)
     }
+
+    // Attempt to implement poll write for the socket
+    fn poll_write_priv(
+        &mut self,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let res = self.write(buf).unwrap();
+        Poll::Ready(Ok(res))
+    }
 }
 
 impl io::Read for UnixStream {
@@ -334,11 +345,11 @@ impl AsyncRead for UnixStream {
 
 impl AsyncWrite for UnixStream {
     fn poll_write(
-            self: Pin<&mut Self>,
+            mut self: Pin<&mut Self>,
             cx: &mut Context<'_>,
             buf: &[u8],
         ) -> Poll<Result<usize, std::io::Error>> {
-        self.poll_write_priv(cx, buf)
+            self.poll_write_priv(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
@@ -346,7 +357,7 @@ impl AsyncWrite for UnixStream {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-        self.shutdown_std(std::net::Shutdown::Write)?;
+        self.shutdown(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
     }
 }
