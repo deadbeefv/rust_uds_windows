@@ -1,6 +1,5 @@
 use std::fmt;
 use std::io;
-use std::io::Write;
 use std::mem;
 use std::net::Shutdown;
 use std::os::raw::c_int;
@@ -9,6 +8,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use std::u8;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -270,15 +270,7 @@ impl UnixStream {
         self.0.timeout(SO_SNDTIMEO)
     }
 
-    // Attempt to implement poll write for the socket
-    fn poll_write_priv(
-        &mut self,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        let res = self.write(buf).unwrap();
-        Poll::Ready(Ok(res))
-    }
+
 }
 
 impl io::Read for UnixStream {
@@ -339,7 +331,11 @@ impl AsyncRead for UnixStream {
             cx: &mut Context<'_>,
             buf: &mut tokio::io::ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
-        self.poll_read(cx, buf)
+            let mut buffer: [u8; 3000] = [0; 3000];
+            match self.0.read(&mut buffer) {
+                Ok(size) => Poll::Ready(Ok(())),
+                Err(E) => Poll::Ready(Err(E))
+            }
     }
 }
 
@@ -349,7 +345,7 @@ impl AsyncWrite for UnixStream {
             cx: &mut Context<'_>,
             buf: &[u8],
         ) -> Poll<Result<usize, std::io::Error>> {
-            self.poll_write_priv(cx, buf)
+            self.poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
@@ -465,6 +461,13 @@ impl UnixListener {
         let sock = self.0.accept(&mut storage as *mut _ as *mut _, &mut len)?;
         let addr = from_sockaddr_un(storage, len)?;
         Ok((UnixStream(sock), addr))
+    }
+
+    pub fn poll_accept(&self) -> Result<UnixStream, io::Error> {
+        match self.accept() {
+            Ok((socket, addr)) => Ok(socket),
+            Err(e) => Err(e)
+        }
     }
 
     /// Creates a new independently owned handle to the underlying socket.
@@ -676,7 +679,7 @@ mod test {
         let (_dir, socket_path) = or_panic!(tmpdir());
         let msg1 = b"hello";
         let msg2 = b"world!";
-
+        println!("\n\nSocket path: {}\n\n", socket_path.display());
         let listener = or_panic!(UnixListener::bind(&socket_path));
         let thread = thread::spawn(move || {
             let mut stream = or_panic!(listener.accept()).0;
