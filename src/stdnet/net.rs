@@ -328,13 +328,16 @@ impl IntoRawSocket for UnixStream {
 impl AsyncRead for UnixStream {
     fn poll_read(
             self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
+            _cx: &mut Context<'_>,
             buf: &mut tokio::io::ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
-            let mut buffer: [u8; 3000] = [0; 3000];
+            let mut buffer: [u8; 10000] = [0; 10000];
             match self.0.read(&mut buffer) {
-                Ok(size) => Poll::Ready(Ok(())),
-                Err(E) => Poll::Ready(Err(E))
+                Ok(_size) => {
+                    buf.put_slice(&buffer);
+                    Poll::Ready(Ok(()))
+                },
+                Err(e) => Poll::Ready(Err(e))
             }
     }
 }
@@ -345,7 +348,12 @@ impl AsyncWrite for UnixStream {
             cx: &mut Context<'_>,
             buf: &[u8],
         ) -> Poll<Result<usize, std::io::Error>> {
-            self.poll_write(cx, buf)
+            match self.0.write(buf) {
+                Ok(size) => {
+                    Poll::Ready(Ok(size))
+                },
+                Err(e) => Poll::Ready(Err(e))
+            }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
